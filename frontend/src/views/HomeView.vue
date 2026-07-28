@@ -8,31 +8,36 @@
       <router-link to="/settings" class="text-2xl">⚙️</router-link>
     </header>
 
-    <h1 class="text-2xl font-bold mb-4">
-      خوش آمدی {{ authStore.user?.displayName }}
-    </h1>
+    <h1 class="text-2xl font-bold mb-4">{{ authStore.user?.displayName }}</h1>
 
-    <div v-if="isLoading" class="text-center text-gray-500 py-8">در حال بارگذاری...</div>
-    <p v-else-if="errorMessage" class="text-red-500 text-center py-4">{{ errorMessage }}</p>
+    <div class="flex gap-2 mb-6">
+      <button
+        class="flex-1 rounded-pill py-2 font-bold border"
+        :class="mode === 'solo' ? 'bg-accent-light dark:bg-accent-dark text-white border-transparent' : 'border-border-light dark:border-border-dark'"
+        @click="mode = 'solo'"
+      >
+        تکی
+      </button>
+      <button
+        class="flex-1 rounded-pill py-2 font-bold border"
+        :class="mode === 'duel' ? 'bg-accent-light dark:bg-accent-dark text-white border-transparent' : 'border-border-light dark:border-border-dark'"
+        @click="mode = 'duel'"
+      >
+        دو نفره
+      </button>
+    </div>
 
-    <div v-else class="grid grid-cols-2 gap-4 mb-6">
+    <div class="grid grid-cols-2 gap-4 mb-6">
       <div
         v-for="category in categories"
         :key="category.id"
-        class="rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-4 text-center cursor-pointer hover:opacity-80 transition-opacity active:scale-95"
-        @click="startSolo(category.id)"
+        class="rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-4 text-center cursor-pointer"
+        @click="startGame(category.id)"
       >
         <div class="text-3xl mb-2">{{ category.icon }}</div>
         <div class="font-semibold">{{ category.name }}</div>
       </div>
     </div>
-
-    <button
-      class="w-full rounded-pill py-3 mb-6 bg-accent-light dark:bg-accent-dark text-white font-bold"
-      @click="router.push('/duel-lobby')"
-    >
-      ⚔️ شروع بازی دونفره
-    </button>
 
     <AdSlot slot-id="home-banner" :height-px="90" class="mb-6" />
     <BottomNav />
@@ -40,38 +45,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.store'
-import { apiClient } from '../services/api-client'
 import AdSlot from '../components/AdSlot.vue'
 import BottomNav from '../components/BottomNav.vue'
 
-interface Category {
-  id: string
-  name: string
-  icon: string
-}
-
 const router = useRouter()
 const authStore = useAuthStore()
+const mode = ref<'solo' | 'duel'>('solo')
 
-const categories = ref<Category[]>([])
-const isLoading = ref(true)
-const errorMessage = ref('')
+// Static fallback list; replace with GET /api/categories once a categories endpoint is added.
+const categories = ref([
+  { id: 'general-knowledge', name: 'عمومی', icon: '🧠' },
+  { id: 'sports', name: 'ورزش', icon: '⚽' },
+  { id: 'science-nature', name: 'علوم', icon: '🔬' },
+  { id: 'history', name: 'تاریخ', icon: '📜' },
+])
 
-onMounted(async () => {
-  try {
-    const { data } = await apiClient.get<Category[]>("/api/categories");
-    categories.value = data;
-  } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : 'خطا در دریافت دسته‌بندی‌ها'
-  } finally {
-    isLoading.value = false
+function startGame(categoryId: string) {
+  if (mode.value === 'solo') {
+    router.push(`/play/${categoryId}`)
+  } else {
+    router.push(`/duel-lobby/${categoryId}`)
   }
-})
-
-function startSolo(categoryId: string) {
-  router.push(`/play/${categoryId}`)
 }
 </script>

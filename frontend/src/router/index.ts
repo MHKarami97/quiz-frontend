@@ -21,15 +21,15 @@ export const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: "/duel-lobby",
-      name: "duel-lobby",
-      component: () => import("../views/DuelLobbyView.vue"),
-      meta: { requiresAuth: true },
-    },
-    {
       path: "/play/:categoryId",
       name: "solo-play",
       component: () => import("../views/SoloGameView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: "/duel-lobby/:categoryId",
+      name: "duel-lobby",
+      component: () => import("../views/DuelLobbyView.vue"),
       meta: { requiresAuth: true },
     },
     {
@@ -50,7 +50,6 @@ export const router = createRouter({
       component: () => import("../views/SettingsView.vue"),
       meta: { requiresAuth: true },
     },
-
     {
       path: "/admin",
       component: () => import("../views/admin/AdminLayout.vue"),
@@ -104,10 +103,7 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const authStore = useAuthStore();
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+  if (to.meta.requiresAuth && !authStore.isAuthenticated)
     return { name: "login" };
-  }
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return { name: "home" };
-  }
+  if (to.meta.requiresAdmin && !authStore.isAdmin) return { name: "home" };
 });

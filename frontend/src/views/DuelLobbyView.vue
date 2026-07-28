@@ -1,126 +1,118 @@
 <template>
-  <div
-    class="min-h-screen p-6 max-w-lg mx-auto flex flex-col justify-center gap-6 pb-24"
-  >
-    <h1 class="text-2xl font-bold text-center">بازی دونفره</h1>
-
-    <div v-if="isLoading" class="text-center text-gray-500 py-8">
-      در حال بارگذاری...
+  <div class="min-h-screen p-6 max-w-lg mx-auto flex flex-col gap-6">
+    <div class="flex items-center">
+      <a href="#" class="text-2xl" @click.prevent="cancelAndLeave">←</a>
     </div>
 
-    <div v-else-if="!isSearching" class="grid grid-cols-2 gap-4">
-      <div
-        v-for="category in categories"
-        :key="category.id"
-        class="rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-4 text-center cursor-pointer hover:opacity-80 transition-opacity active:scale-95"
-        @click="startMatchmaking(category.id)"
-      >
-        <div class="text-3xl mb-2">{{ category.icon }}</div>
-        <div class="font-semibold">{{ category.name }}</div>
-      </div>
-    </div>
+    <div class="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+      <template v-if="!errorMessage">
+        <div class="w-16 h-16 border-4 border-accent-light dark:border-accent-dark border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-lg font-bold">در انتظار حریف...</p>
+        <p class="text-sm text-gray-500">{{ elapsedLabel }}</p>
+      </template>
 
-    <div v-else class="text-center">
-      <div class="animate-pulse text-xl font-bold mb-2">
-        در حال جستجوی حریف...
-      </div>
-      <p v-if="errorMessage" class="text-red-500 text-sm mb-2">
-        {{ errorMessage }}
-      </p>
-      <button
-        class="mt-4 rounded-pill px-6 py-2 border border-border-light dark:border-border-dark font-bold"
-        @click="cancelSearch"
-      >
-        لغو
-      </button>
+      <template v-else>
+        <p class="text-lg font-bold text-red-500">{{ errorMessage }}</p>
+        <button
+          class="rounded-pill px-6 py-2 bg-accent-light dark:bg-accent-dark text-white font-bold"
+          @click="retry"
+        >
+          تلاش دوباره
+        </button>
+      </template>
     </div>
-
-    <BottomNav />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import { useRouter } from "vue-router";
-import { apiClient } from "../services/api-client";
-import BottomNav from "../components/BottomNav.vue";
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { apiClient } from '../services/api-client'
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-}
+const route = useRoute()
+const router = useRouter()
+const categoryId = route.params.categoryId as string
 
-interface MatchmakeResponse {
-  matched: boolean;
-  sessionId?: string;
-}
+const errorMessage = ref('')
+const elapsedSeconds = ref(0)
+const elapsedLabel = ref('00:00')
 
-const router = useRouter();
-const categories = ref<Category[]>([]);
-const isLoading = ref(true);
-const isSearching = ref(false);
-const errorMessage = ref("");
-let pollInterval: ReturnType<typeof setInterval> | null = null;
+let pollInterval: ReturnType<typeof setInterval> | null = null
+let tickInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(async () => {
-  try {
-    const { data } = await apiClient.get<Category[]>("/api/categories");
-    categories.value = data;
-  } catch (err) {
-    errorMessage.value =
-      err instanceof Error ? err.message : "خطا در دریافت دسته‌بندی‌ها";
-  } finally {
-    isLoading.value = false;
-  }
-});
+// حداکثر زمان انتظار قبل از نمایش خطا (باید هم‌راستا با MATCHMAKING_TTL در بک‌اند باشد)
+const MAX_WAIT_SECONDS = 120
 
-onUnmounted(() => {
-  if (pollInterval) clearInterval(pollInterval);
-});
-
-async function startMatchmaking(categoryId: string) {
-  isSearching.value = true;
-  errorMessage.value = "";
+async function startMatchmaking() {
+  errorMessage.value = ''
+  elapsedSeconds.value = 0
 
   try {
-    const result = await apiClient.post<MatchmakeResponse>(
-      "/api/game/duel/matchmake",
-      {
-        categoryId,
-      },
-    );
+    const enqueueResult = await apiClient.post<{ matched: boolean; sessionId?: string }>(
+      '/api/game/duel/matchmake',
+      { categoryId }
+    )
 
-    if (result.data.matched && result.data.sessionId) {
-      router.push(`/duel/${result.data.sessionId}`);
-      return;
+    if (enqueueResult.data.matched && enqueueResult.data.sessionId) {
+      goToMatch(enqueueResult.data.sessionId)
+      return
     }
+
+    tickInterval = setInterval(() => {
+      elapsedSeconds.value += 1
+      const m = String(Math.floor(elapsedSeconds.value / 60)).padStart(2, '0')
+      const s = String(elapsedSeconds.value % 60).padStart(2, '0')
+      elapsedLabel.value = `${m}:${s}`
+
+      if (elapsedSeconds.value >= MAX_WAIT_SECONDS) {
+        stopPolling()
+        errorMessage.value = 'حریفی پیدا نشد. لطفا دوباره تلاش کنید.'
+      }
+    }, 1000)
 
     pollInterval = setInterval(async () => {
       try {
-        const poll = await apiClient.get<MatchmakeResponse>(
-          "/api/game/duel/matchmake/poll",
-        );
-        if (poll.data.matched && poll.data.sessionId) {
-          if (pollInterval) clearInterval(pollInterval);
-          router.push(`/duel/${poll.data.sessionId}`);
+        const pollResult = await apiClient.get<{ matched: boolean; sessionId?: string }>(
+          '/api/game/duel/matchmake/poll'
+        )
+        if (pollResult.data.matched && pollResult.data.sessionId) {
+          goToMatch(pollResult.data.sessionId)
         }
-      } catch (err) {
-        if (pollInterval) clearInterval(pollInterval);
-        errorMessage.value =
-          err instanceof Error ? err.message : "خطا در جستجوی حریف";
-        isSearching.value = false;
+      } catch {
+        // خطای موقت شبکه در poll را نادیده می‌گیریم، دور بعدی دوباره تلاش می‌شود
       }
-    }, 2000);
+    }, 2000)
   } catch (err) {
-    errorMessage.value =
-      err instanceof Error ? err.message : "خطا در شروع جستجو";
-    isSearching.value = false;
+    errorMessage.value = err instanceof Error ? err.message : 'خطا در اتصال به سرور.'
   }
 }
 
-function cancelSearch() {
-  if (pollInterval) clearInterval(pollInterval);
-  isSearching.value = false;
+function goToMatch(sessionId: string) {
+  stopPolling()
+  router.push(`/duel/${sessionId}`)
 }
+
+function stopPolling() {
+  if (pollInterval) clearInterval(pollInterval)
+  if (tickInterval) clearInterval(tickInterval)
+  pollInterval = null
+  tickInterval = null
+}
+
+function retry() {
+  startMatchmaking()
+}
+
+async function cancelAndLeave() {
+  stopPolling()
+  try {
+    await apiClient.post('/api/game/duel/matchmake/cancel', { categoryId })
+  } catch {
+    // اگر لغو در سرور خطا داد هم کاربر را معطل نمی‌کنیم
+  }
+  router.push('/home')
+}
+
+onMounted(startMatchmaking)
+onUnmounted(stopPolling)
 </script>
