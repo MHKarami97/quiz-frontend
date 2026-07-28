@@ -12,7 +12,7 @@ export default defineConfig({
       includeAssets: ["icons/*.png"],
       manifest: {
         name: "چیستا",
-        short_name: "QuizKings",
+        short_name: "Chista",
         description: "بازی چیستا آنلاین تک‌نفره و دونفره",
         theme_color: "#611f69",
         background_color: "#fefbff",
