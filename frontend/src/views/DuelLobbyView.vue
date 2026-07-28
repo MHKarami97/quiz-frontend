@@ -91,8 +91,8 @@ async function startMatchmaking(categoryId: string) {
       },
     );
 
-    if (result.matched && result.sessionId) {
-      router.push(`/duel/${result.sessionId}`);
+    if (result.data.matched && result.data.sessionId) {
+      router.push(`/duel/${result.data.sessionId}`);
       return;
     }
 
@@ -101,9 +101,9 @@ async function startMatchmaking(categoryId: string) {
         const poll = await apiClient.get<MatchmakeResponse>(
           "/api/game/duel/matchmake/poll",
         );
-        if (poll.matched && poll.sessionId) {
+        if (poll.data.matched && poll.data.sessionId) {
           if (pollInterval) clearInterval(pollInterval);
-          router.push(`/duel/${poll.sessionId}`);
+          router.push(`/duel/${poll.data.sessionId}`);
         }
       } catch (err) {
         if (pollInterval) clearInterval(pollInterval);

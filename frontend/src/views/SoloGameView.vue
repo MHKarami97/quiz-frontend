@@ -97,8 +97,8 @@ onMounted(async () => {
       totalQuestions: number;
     }>("/api/game/solo/start", { categoryId: route.params.categoryId });
 
-    sessionId.value = data.sessionId;
-    currentQuestion.value = data.firstQuestion;
+    sessionId.value = data.data.sessionId;
+    currentQuestion.value = data.data.firstQuestion;
     startTimer();
   } catch (err) {
     // این دسته‌بندی سوالی ندارد یا خطای شبکه رخ داده — به‌جای صفحه سفید، پیام واضح نشان می‌دهیم
@@ -145,11 +145,11 @@ async function handleAnswer(optionId: string | null) {
     });
 
     hasAnswered.value = true;
-    lastWasCorrect.value = data.isCorrect;
-    lastPoints.value = data.pointsAwarded;
-    hasNext.value = data.hasNext;
-    lastCorrectOptionId.value = data.isCorrect ? optionId : null;
-    nextQuestionCache = data.nextQuestion;
+    lastWasCorrect.value = data.data.isCorrect;
+    lastPoints.value = data.data.pointsAwarded;
+    hasNext.value = data.data.hasNext;
+    lastCorrectOptionId.value = data.data.isCorrect ? optionId : null;
+    nextQuestionCache = data.data.nextQuestion;
   } catch (err) {
     loadError.value = "خطا در ثبت پاسخ. لطفا دوباره تلاش کنید.";
   }
