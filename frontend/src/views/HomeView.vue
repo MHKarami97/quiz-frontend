@@ -51,7 +51,7 @@ const isLoading = ref(true);
 
 onMounted(async () => {
   try {
-    const data = await apiClient.get<Category[]>("/api/categories");
+    const { data } = await apiClient.get<Category[]>("/api/categories");
     categories.value = data;
   } finally {
     isLoading.value = false;
