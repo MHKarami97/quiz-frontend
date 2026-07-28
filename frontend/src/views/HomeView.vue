@@ -45,23 +45,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.store'
 import AdSlot from '../components/AdSlot.vue'
 import BottomNav from '../components/BottomNav.vue'
+import { apiClient } from '../services/api-client'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const mode = ref<'solo' | 'duel'>('solo')
 
-// Static fallback list; replace with GET /api/categories once a categories endpoint is added.
-const categories = ref([
-  { id: 'general-knowledge', name: 'عمومی', icon: '🧠' },
-  { id: 'sports', name: 'ورزش', icon: '⚽' },
-  { id: 'science-nature', name: 'علوم', icon: '🔬' },
-  { id: 'history', name: 'تاریخ', icon: '📜' },
-])
+interface Category {
+  id: string
+  name: string
+  icon: string
+}
+
+const categories = ref<Category[]>([])
+const isLoading = ref(true)
+const errorMessage = ref('')
+
+onMounted(async () => {
+  try {
+    const { data } = await apiClient.get<Category[]>("/api/categories");
+    categories.value = data;
+  } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : 'خطا در دریافت دسته‌بندی‌ها'
+  } finally {
+    isLoading.value = false
+  }
+})
 
 function startGame(categoryId: string) {
   if (mode.value === 'solo') {
