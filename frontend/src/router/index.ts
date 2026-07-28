@@ -1,8 +1,6 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import { useAuthStore } from "../store/auth.store";
 
-// Hash history is required for GitHub Pages (no server-side rewrite
-// rules available for path-based SPA routing on static hosting).
 export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
@@ -13,6 +11,23 @@ export const router = createRouter({
     { path: "/duel/:sessionId", name: "duel-play", component: () => import("../views/DuelGameView.vue"), meta: { requiresAuth: true } },
     { path: "/leaderboard", name: "leaderboard", component: () => import("../views/LeaderboardView.vue"), meta: { requiresAuth: true } },
     { path: "/settings", name: "settings", component: () => import("../views/SettingsView.vue"), meta: { requiresAuth: true } },
+
+    {
+      path: "/admin",
+      component: () => import("../views/admin/AdminLayout.vue"),
+      meta: { requiresAuth: true, requiresAdmin: true },
+      children: [
+        { path: "", redirect: "/admin/dashboard" },
+        { path: "dashboard", name: "admin-dashboard", component: () => import("../views/admin/AdminDashboardView.vue") },
+        { path: "categories", name: "admin-categories", component: () => import("../views/admin/AdminCategoriesView.vue") },
+        { path: "questions", name: "admin-questions", component: () => import("../views/admin/AdminQuestionsView.vue") },
+        { path: "questions/new", name: "admin-question-new", component: () => import("../views/admin/AdminQuestionFormView.vue") },
+        { path: "questions/:id/edit", name: "admin-question-edit", component: () => import("../views/admin/AdminQuestionFormView.vue") },
+        { path: "questions/bulk-import", name: "admin-question-bulk-import", component: () => import("../views/admin/AdminBulkImportView.vue") },
+        { path: "users", name: "admin-users", component: () => import("../views/admin/AdminUsersView.vue") },
+        { path: "promo-codes", name: "admin-promo-codes", component: () => import("../views/admin/AdminPromoCodesView.vue") },
+      ],
+    },
   ],
 });
 
@@ -20,5 +35,8 @@ router.beforeEach((to) => {
   const authStore = useAuthStore();
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return { name: "login" };
+  }
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return { name: "home" };
   }
 });

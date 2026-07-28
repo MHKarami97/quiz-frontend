@@ -20,14 +20,14 @@ async function request<T = any>(path: string, options: RequestOptions = {}): Pro
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || "Request failed");
+    throw new Error(data.error || "درخواست ناموفق بود");
   }
   return { data };
 }
 
-// Thin fetch wrapper — kept dependency-free intentionally (no axios)
-// to reduce bundle size for the PWA.
 export const apiClient = {
   get: <T = any>(path: string) => request<T>(path),
-  post: <T = any>(path: string, body: unknown) => request<T>(path, { method: "POST", body }),
+  post: <T = any>(path: string, body?: unknown) => request<T>(path, { method: "POST", body }),
+  put: <T = any>(path: string, body?: unknown) => request<T>(path, { method: "PUT", body }),
+  delete: <T = any>(path: string) => request<T>(path, { method: "DELETE" }),
 };
