@@ -6,7 +6,7 @@
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
       <input v-model="email" type="email" placeholder="ایمیل" required
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
-      <input v-model="password" type="password" placeholder="رمز عبور (حداقل ۸ کاراکتر)" required minlength="8"
+      <input v-model="password" type="password" placeholder="رمز عبور (حداقل ۸ کاراکتر)" required minlength="8" autocomplete="new-password"
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
       <p v-if="errorMessage" class="text-red-500 text-sm text-center">{{ errorMessage }}</p>
       <button type="submit" :disabled="isLoading"

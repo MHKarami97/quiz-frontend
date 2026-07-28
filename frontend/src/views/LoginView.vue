@@ -4,7 +4,7 @@
       <h1 class="text-2xl font-bold text-center mb-4">ورود به چیستا</h1>
       <input v-model="email" type="email" placeholder="ایمیل" required
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
-      <input v-model="password" type="password" placeholder="رمز عبور" required
+      <input v-model="password" type="password" placeholder="رمز عبور" required autocomplete="current-password"
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
       <p v-if="errorMessage" class="text-red-500 text-sm text-center">{{ errorMessage }}</p>
       <button type="submit" :disabled="isLoading"
