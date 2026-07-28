@@ -4,11 +4,22 @@
       <a href="#" class="text-2xl" @click.prevent="confirmLeave">←</a>
     </div>
 
-    <p v-if="status === 'waiting'" class="text-center text-lg flex-1 flex items-center justify-center">
+    <p v-if="status === 'connecting'" class="text-center text-lg flex-1 flex items-center justify-center">
+      در حال اتصال...
+    </p>
+
+    <p v-else-if="status === 'waiting'" class="text-center text-lg flex-1 flex items-center justify-center">
       در انتظار بازیکن دوم...
     </p>
 
-    <div class="flex-1 flex flex-col justify-center gap-6">
+    <div v-else-if="connectionError" class="flex-1 flex flex-col items-center justify-center text-center gap-3">
+      <p class="text-lg font-bold text-red-500">{{ connectionError }}</p>
+      <router-link to="/home" class="rounded-pill px-6 py-2 bg-accent-light dark:bg-accent-dark text-white font-bold">
+        بازگشت به خانه
+      </router-link>
+    </div>
+
+    <div v-else class="flex-1 flex flex-col justify-center gap-6">
       <QuestionCard
         v-if="currentQuestion && status === 'in_progress'"
         :question="currentQuestion"
@@ -29,7 +40,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../store/auth.store'
+import { apiClient } from '../services/api-client'
+import QuestionCard from '../components/QuestionCard.vue'
 
 interface QuestionOption {
   id: string
@@ -43,34 +55,64 @@ interface QuestionData {
 
 const route = useRoute()
 const router = useRouter()
-const authStore = useAuthStore()
-const status = ref<'waiting' | 'in_progress' | 'finished'>('waiting')
+const status = ref<'connecting' | 'waiting' | 'in_progress' | 'finished'>('connecting')
 const currentQuestion = ref<QuestionData | null>(null)
 const selectedOptionId = ref<string | null>(null)
 const hasAnswered = ref(false)
+const connectionError = ref('')
 let socket: WebSocket | null = null
 
-onMounted(() => {
-  const wsBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('https', 'wss')
-  const sessionId = route.params.sessionId
-  socket = new WebSocket(`${wsBaseUrl}/api/game/duel/${sessionId}/join?playerId=${authStore.user?.id}`)
+onMounted(async () => {
+  const sessionId = route.params.sessionId as string
 
-  socket.onmessage = (event) => {
-    const message = JSON.parse(event.data)
-    if (message.type === 'match_started') status.value = 'in_progress'
-    if (message.type === 'next_question') hasAnswered.value = false
-    if (message.type === 'match_finished') status.value = 'finished'
+  if (!sessionId || sessionId === 'undefined') {
+    connectionError.value = 'شناسه بازی نامعتبر است.'
+    return
+  }
+
+  try {
+    // نکته مهم: apiClient پاسخ را مستقیم برمی‌گرداند (بدون بسته‌بندی در data)
+    const ticketRes = await apiClient.post<{ ticket: string }>(
+      `/api/game/duel/${sessionId}/ws-ticket`
+    )
+    const ticket = ticketRes.data.ticket
+
+    const wsBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('https', 'wss')
+    socket = new WebSocket(
+      `${wsBaseUrl}/api/game/duel/${sessionId}/join?ticket=${ticket}`
+    )
+
+    status.value = 'waiting'
+
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data)
+      if (message.type === 'match_started') status.value = 'in_progress'
+      if (message.type === 'next_question') hasAnswered.value = false
+      if (message.type === 'match_finished') status.value = 'finished'
+    }
+
+    socket.onerror = () => {
+      connectionError.value = 'اتصال به بازی برقرار نشد. لطفا دوباره تلاش کنید.'
+    }
+
+    socket.onclose = (event) => {
+      if (status.value !== 'finished' && event.code !== 1000) {
+        connectionError.value = 'ارتباط قطع شد. لطفا دوباره تلاش کنید.'
+      }
+    }
+  } catch (err) {
+    connectionError.value = 'خطا در برقراری اتصال به بازی.'
   }
 })
 
 onUnmounted(() => {
-  socket?.close()
+  socket?.close(1000)
 })
 
 function confirmLeave() {
   const ok = window.confirm('اگر بازگردید، از بازی دونفره خارج می‌شوید. مطمئن هستید؟')
   if (ok) {
-    socket?.close()
+    socket?.close(1000)
     router.push('/home')
   }
 }
