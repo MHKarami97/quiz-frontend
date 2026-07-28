@@ -20,6 +20,9 @@
     </div>
 
     <div v-else-if="status === 'in_progress'" class="flex-1 flex flex-col justify-center gap-6">
+      <p v-if="currentQuestion" class="text-center text-sm text-gray-500 dark:text-gray-400">
+        سوال {{ currentIndex }} از {{ totalQuestions }}
+      </p>
       <p v-if="lastResult" class="text-center font-bold" :class="lastResult.isCorrect ? 'text-green-500' : 'text-red-500'">
         {{ lastResult.isCorrect ? 'آفرین!' : 'اشتباه بود' }} ({{ lastResult.pointsAwarded }} امتیاز)
       </p>
@@ -50,15 +53,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { apiClient } from '../services/api-client'
 import QuestionCard from '../components/QuestionCard.vue'
 
-interface QuestionOption {
-  id: string
-  text: string
-}
-interface QuestionData {
-  id: string
-  text: string
-  options: QuestionOption[]
-}
+interface QuestionOption { id: string; text: string }
+interface QuestionData { id: string; text: string; options: QuestionOption[] }
 
 const route = useRoute()
 const router = useRouter()
@@ -69,27 +65,22 @@ const hasAnswered = ref(false)
 const connectionError = ref('')
 const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null)
 const waitingForOpponent = ref(false)
+const totalQuestions = ref(0)
+const currentIndex = ref(0)
 let socket: WebSocket | null = null
 
 onMounted(async () => {
   const sessionId = route.params.sessionId as string
-
   if (!sessionId || sessionId === 'undefined') {
     connectionError.value = 'شناسه بازی نامعتبر است.'
     return
   }
 
   try {
-    const ticketRes = await apiClient.post<{ ticket: string }>(
-      `/api/game/duel/${sessionId}/ws-ticket`
-    )
+    const ticketRes = await apiClient.post<{ ticket: string }>(`/api/game/duel/${sessionId}/ws-ticket`)
     const ticket = ticketRes.data.ticket
-
     const wsBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('https', 'wss')
-    socket = new WebSocket(
-      `${wsBaseUrl}/api/game/duel/${sessionId}/join?ticket=${ticket}`
-    )
-
+    socket = new WebSocket(`${wsBaseUrl}/api/game/duel/${sessionId}/join?ticket=${ticket}`)
     status.value = 'waiting'
 
     socket.onmessage = (event) => {
@@ -98,6 +89,8 @@ onMounted(async () => {
       if (message.type === 'match_started') {
         status.value = 'in_progress'
         currentQuestion.value = message.question ?? null
+        totalQuestions.value = message.totalQuestions ?? 0
+        currentIndex.value = (message.questionIndex ?? 0) + 1
         selectedOptionId.value = null
         hasAnswered.value = false
         lastResult.value = null
@@ -114,6 +107,8 @@ onMounted(async () => {
 
       if (message.type === 'next_question') {
         currentQuestion.value = message.question ?? null
+        totalQuestions.value = message.totalQuestions ?? totalQuestions.value
+        currentIndex.value = (message.questionIndex ?? 0) + 1
         selectedOptionId.value = null
         hasAnswered.value = false
         waitingForOpponent.value = false
@@ -154,13 +149,11 @@ function handleAnswer(optionId: string) {
   if (!socket || hasAnswered.value || !currentQuestion.value) return
   selectedOptionId.value = optionId
   hasAnswered.value = true
-  socket.send(
-    JSON.stringify({
-      type: 'submit_answer',
-      questionId: currentQuestion.value.id,
-      selectedOptionId: optionId,
-      elapsedMs: 5000,
-    })
-  )
+  socket.send(JSON.stringify({
+    type: 'submit_answer',
+    questionId: currentQuestion.value.id,
+    selectedOptionId: optionId,
+    elapsedMs: 5000,
+  }))
 }
 </script>

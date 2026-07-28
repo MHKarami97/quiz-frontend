@@ -16,6 +16,9 @@
 
     <template v-else>
       <div class="flex-1 flex flex-col justify-center gap-6">
+        <p v-if="currentQuestion" class="text-center text-sm text-gray-500 dark:text-gray-400">
+          سوال {{ currentIndex }} از {{ totalQuestions }}
+        </p>
         <CircularTimer
           v-if="currentQuestion"
           :seconds-left="secondsLeft"
@@ -51,6 +54,7 @@
 
         <div v-if="isFinished" class="text-center">
           <h2 class="text-2xl font-bold mb-3">بازی تمام شد!</h2>
+          <p class="text-gray-500 mb-3">امتیاز کل این بازی: {{ totalScore }}</p>
           <router-link to="/home" class="text-accent-light dark:text-accent-dark"
             >بازگشت به خانه</router-link
           >
@@ -88,9 +92,12 @@ const hasNext = ref(true);
 const isFinished = ref(false);
 const lastWasCorrect = ref(false);
 const lastPoints = ref(0);
+const totalScore = ref(0);
 const secondsLeft = ref(15);
 const loadError = ref("");
 const questionStartedAt = ref(0);
+const totalQuestions = ref(0);
+const currentIndex = ref(0);
 let timerInterval: ReturnType<typeof setInterval> | null = null;
 let nextQuestionCache: QuestionData | null = null;
 
@@ -104,9 +111,10 @@ onMounted(async () => {
 
     sessionId.value = data.data.sessionId;
     currentQuestion.value = data.data.firstQuestion;
+    totalQuestions.value = data.data.totalQuestions;
+    currentIndex.value = 1;
     startTimer();
   } catch (err) {
-    // این دسته‌بندی سوالی ندارد یا خطای شبکه رخ داده — به‌جای صفحه سفید، پیام واضح نشان می‌دهیم
     loadError.value =
       err instanceof Error && err.message.includes("No questions available")
         ? "این دسته‌بندی هنوز سوالی ندارد. لطفا دسته‌بندی دیگری را انتخاب کنید."
@@ -165,6 +173,10 @@ async function handleAnswer(optionId: string | null) {
     hasNext.value = data.data.hasNext;
     lastCorrectOptionId.value = data.data.isCorrect ? optionId : null;
     nextQuestionCache = data.data.nextQuestion;
+
+    if (data.data.isCorrect) {
+      totalScore.value += data.data.pointsAwarded;
+    }
   } catch (err) {
     loadError.value = "خطا در ثبت پاسخ. لطفا دوباره تلاش کنید.";
   }
@@ -179,6 +191,7 @@ function nextStep() {
   selectedOptionId.value = null;
   lastCorrectOptionId.value = null;
   hasAnswered.value = false;
+  currentIndex.value += 1;
   startTimer();
 }
 </script>

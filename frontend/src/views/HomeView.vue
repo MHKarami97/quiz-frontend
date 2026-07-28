@@ -1,9 +1,16 @@
 <template>
   <div class="min-h-screen pb-24 p-6 max-w-lg mx-auto">
     <header class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-2">
-        <span class="text-xl">🪙</span>
-        <span class="font-bold">{{ authStore.user?.coins ?? 0 }}</span>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🪙</span>
+          <span class="font-bold">{{ authStore.user?.coins ?? 0 }}</span>
+        </div>
+        <div v-if="myScore" class="flex items-center gap-2">
+          <span class="text-xl">🏆</span>
+          <span class="font-bold">{{ myScore.totalPoints }}</span>
+          <span v-if="myScore.rank" class="text-xs text-gray-500">(رتبه {{ myScore.rank }})</span>
+        </div>
       </div>
       <router-link to="/settings" class="text-2xl">⚙️</router-link>
     </header>
@@ -27,7 +34,11 @@
       </button>
     </div>
 
-    <div class="grid grid-cols-2 gap-4 mb-6">
+    <p v-if="errorMessage" class="text-red-500 text-sm mb-4 text-center">{{ errorMessage }}</p>
+
+    <div v-if="isLoading" class="text-center text-gray-500 py-8">در حال بارگذاری دسته‌بندی‌ها...</div>
+
+    <div v-else class="grid grid-cols-2 gap-4 mb-6">
       <div
         v-for="category in categories"
         :key="category.id"
@@ -37,6 +48,9 @@
         <div class="text-3xl mb-2">{{ category.icon }}</div>
         <div class="font-semibold">{{ category.name }}</div>
       </div>
+      <p v-if="categories.length === 0" class="col-span-2 text-center text-gray-500 py-8">
+        دسته‌بندی‌ای یافت نشد.
+      </p>
     </div>
 
     <AdSlot slot-id="home-banner" :height-px="90" class="mb-6" />
@@ -65,6 +79,7 @@ interface Category {
 const categories = ref<Category[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
+const myScore = ref<{ totalPoints: number; rank: number | null } | null>(null)
 
 onMounted(async () => {
   try {
@@ -74,6 +89,13 @@ onMounted(async () => {
     errorMessage.value = err instanceof Error ? err.message : 'خطا در دریافت دسته‌بندی‌ها'
   } finally {
     isLoading.value = false
+  }
+
+  try {
+    const { data } = await apiClient.get<{ totalPoints: number; rank: number | null }>("/api/leaderboard/me")
+    myScore.value = data
+  } catch {
+    // نمایش امتیاز اختیاری است؛ اگر شکست خورد نباید مانع نمایش بقیه صفحه شود
   }
 })
 
