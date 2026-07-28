@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex items-center justify-center p-6">
     <form @submit.prevent="handleLogin" class="w-full max-w-sm rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-8 space-y-4">
-      <h1 class="text-2xl font-bold text-center mb-4">ورود به کوییز پادشاهان</h1>
+      <h1 class="text-2xl font-bold text-center mb-4">ورود به چیستا</h1>
       <input v-model="email" type="email" placeholder="ایمیل" required
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
       <input v-model="password" type="password" placeholder="رمز عبور" required
