@@ -19,15 +19,19 @@
       </router-link>
     </div>
 
-    <div v-else class="flex-1 flex flex-col justify-center gap-6">
+    <div v-else-if="status === 'in_progress'" class="flex-1 flex flex-col justify-center gap-6">
+      <p v-if="lastResult" class="text-center font-bold" :class="lastResult.isCorrect ? 'text-green-500' : 'text-red-500'">
+        {{ lastResult.isCorrect ? 'آفرین!' : 'اشتباه بود' }} ({{ lastResult.pointsAwarded }} امتیاز)
+      </p>
       <QuestionCard
-        v-if="currentQuestion && status === 'in_progress'"
+        v-if="currentQuestion"
         :question="currentQuestion"
         :selected-option-id="selectedOptionId"
         :correct-option-id="null"
         :has-answered="hasAnswered"
         @answer="handleAnswer"
       />
+      <p v-else class="text-center text-gray-500">در انتظار سوال...</p>
     </div>
 
     <div v-if="status === 'finished'" class="text-center">
@@ -60,6 +64,7 @@ const currentQuestion = ref<QuestionData | null>(null)
 const selectedOptionId = ref<string | null>(null)
 const hasAnswered = ref(false)
 const connectionError = ref('')
+const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null)
 let socket: WebSocket | null = null
 
 onMounted(async () => {
@@ -71,7 +76,6 @@ onMounted(async () => {
   }
 
   try {
-    // نکته مهم: apiClient پاسخ را مستقیم برمی‌گرداند (بدون بسته‌بندی در data)
     const ticketRes = await apiClient.post<{ ticket: string }>(
       `/api/game/duel/${sessionId}/ws-ticket`
     )
@@ -86,9 +90,28 @@ onMounted(async () => {
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data)
-      if (message.type === 'match_started') status.value = 'in_progress'
-      if (message.type === 'next_question') hasAnswered.value = false
-      if (message.type === 'match_finished') status.value = 'finished'
+
+      if (message.type === 'match_started') {
+        status.value = 'in_progress'
+        currentQuestion.value = message.question ?? null
+        selectedOptionId.value = null
+        hasAnswered.value = false
+        lastResult.value = null
+      }
+
+      if (message.type === 'answer_result') {
+        lastResult.value = { isCorrect: message.isCorrect, pointsAwarded: message.pointsAwarded }
+      }
+
+      if (message.type === 'next_question') {
+        currentQuestion.value = message.question ?? null
+        selectedOptionId.value = null
+        hasAnswered.value = false
+      }
+
+      if (message.type === 'match_finished') {
+        status.value = 'finished'
+      }
     }
 
     socket.onerror = () => {
@@ -118,13 +141,13 @@ function confirmLeave() {
 }
 
 function handleAnswer(optionId: string) {
-  if (!socket || hasAnswered.value) return
+  if (!socket || hasAnswered.value || !currentQuestion.value) return
   selectedOptionId.value = optionId
   hasAnswered.value = true
   socket.send(
     JSON.stringify({
       type: 'submit_answer',
-      questionId: currentQuestion.value?.id,
+      questionId: currentQuestion.value.id,
       selectedOptionId: optionId,
       elapsedMs: 5000,
     })
