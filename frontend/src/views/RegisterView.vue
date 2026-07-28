@@ -2,9 +2,9 @@
   <div class="min-h-screen flex items-center justify-center p-6">
     <form @submit.prevent="handleRegister" class="w-full max-w-sm rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-8 space-y-4">
       <h1 class="text-2xl font-bold text-center mb-4">ثبت‌نام</h1>
-      <input v-model="displayName" type="text" placeholder="نام نمایشی" required
+      <input v-model="displayName" type="text" placeholder="نام نمایشی" required autocomplete="name"
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
-      <input v-model="email" type="email" placeholder="ایمیل" required
+      <input v-model="email" type="email" placeholder="ایمیل" required autocomplete="email"
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
       <input v-model="password" type="password" placeholder="رمز عبور (حداقل ۸ کاراکتر)" required minlength="8" autocomplete="new-password"
         class="w-full rounded-pill px-4 py-3 bg-transparent border border-border-light dark:border-border-dark" />
