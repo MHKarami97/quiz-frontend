@@ -23,6 +23,9 @@
       <p v-if="lastResult" class="text-center font-bold" :class="lastResult.isCorrect ? 'text-green-500' : 'text-red-500'">
         {{ lastResult.isCorrect ? 'آفرین!' : 'اشتباه بود' }} ({{ lastResult.pointsAwarded }} امتیاز)
       </p>
+      <p v-if="waitingForOpponent" class="text-center text-gray-500">
+        در انتظار پاسخ حریف...
+      </p>
       <QuestionCard
         v-if="currentQuestion"
         :question="currentQuestion"
@@ -65,6 +68,7 @@ const selectedOptionId = ref<string | null>(null)
 const hasAnswered = ref(false)
 const connectionError = ref('')
 const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null)
+const waitingForOpponent = ref(false)
 let socket: WebSocket | null = null
 
 onMounted(async () => {
@@ -97,16 +101,22 @@ onMounted(async () => {
         selectedOptionId.value = null
         hasAnswered.value = false
         lastResult.value = null
+        waitingForOpponent.value = false
       }
 
       if (message.type === 'answer_result') {
         lastResult.value = { isCorrect: message.isCorrect, pointsAwarded: message.pointsAwarded }
       }
 
+      if (message.type === 'waiting_for_opponent') {
+        waitingForOpponent.value = true
+      }
+
       if (message.type === 'next_question') {
         currentQuestion.value = message.question ?? null
         selectedOptionId.value = null
         hasAnswered.value = false
+        waitingForOpponent.value = false
       }
 
       if (message.type === 'match_finished') {
