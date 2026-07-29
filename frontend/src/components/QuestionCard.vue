@@ -3,7 +3,7 @@
     
     <!-- دکمه گزارش -->
     <button
-      v-if="!showReportPanel && !hasAnswered"
+      v-if="!showReportPanel"
       @click="showReportPanel = true"
       class="absolute top-3 left-3 text-gray-400 hover:text-red-500 transition-colors"
       title="گزارش خطای سوال"
