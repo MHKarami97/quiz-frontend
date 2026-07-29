@@ -1,8 +1,12 @@
 <template>
-  <div class="min-h-screen p-6 max-w-lg mx-auto flex flex-col gap-6">
-    <div class="flex items-center">
-      <a href="#" class="text-2xl" @click.prevent="confirmLeave">←</a>
-    </div>
+  <div class="min-h-screen max-w-lg mx-auto flex flex-col gap-4 p-4">
+    <GameHeader
+      :correct-count="correctCount"
+      :wrong-count="wrongCount"
+      :elapsed-seconds="elapsedSeconds"
+      :score="totalScore"
+      @leave="confirmLeave"
+    />
 
     <p v-if="status === 'connecting'" class="text-center text-lg flex-1 flex items-center justify-center">
       در حال اتصال...
@@ -21,7 +25,7 @@
 
     <div v-else-if="status === 'in_progress'" class="flex-1 flex flex-col justify-center gap-6">
       <p v-if="lastResult" class="text-center font-bold" :class="lastResult.isCorrect ? 'text-green-500' : 'text-red-500'">
-        {{ lastResult.isCorrect ? 'آفرین!' : 'اشتباه بود' }} ({{ lastResult.pointsAwarded }} امتیاز)
+        {{ lastResult.isCorrect ? "آفرین!" : "اشتباه بود" }} ({{ lastResult.pointsAwarded }} امتیاز)
       </p>
       <p v-if="waitingForOpponent" class="text-center text-gray-500">
         در انتظار پاسخ حریف...
@@ -30,7 +34,7 @@
         v-if="currentQuestion"
         :question="currentQuestion"
         :selected-option-id="selectedOptionId"
-        :correct-option-id="null"
+        :correct-option-id="revealedCorrectOptionId"
         :has-answered="hasAnswered"
         @answer="handleAnswer"
       />
@@ -39,128 +43,157 @@
 
     <div v-if="status === 'finished'" class="text-center">
       <h2 class="text-2xl font-bold mb-3">بازی دونفره تمام شد!</h2>
-      <router-link to="/home" class="text-accent-light dark:text-accent-dark">بازگشت به خانه</router-link>
+      <p class="text-lg mb-4">امتیاز شما: <span class="font-bold text-accent-light dark:text-accent-dark">{{ totalScore }}</span></p>
+      <router-link to="/home" class="rounded-pill px-6 py-2 bg-accent-light dark:bg-accent-dark text-white font-bold">
+        بازگشت به خانه
+      </router-link>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { apiClient } from '../services/api-client'
-import QuestionCard from '../components/QuestionCard.vue'
+import { ref, onMounted, onUnmounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { apiClient } from "../services/api-client";
+import QuestionCard from "../components/QuestionCard.vue";
+import GameHeader from "../components/GameHeader.vue";
 
 interface QuestionOption {
-  id: string
-  text: string
+  id: string;
+  text: string;
 }
 interface QuestionData {
-  id: string
-  text: string
-  options: QuestionOption[]
+  id: string;
+  text: string;
+  options: QuestionOption[];
 }
 
-const route = useRoute()
-const router = useRouter()
-const status = ref<'connecting' | 'waiting' | 'in_progress' | 'finished'>('connecting')
-const currentQuestion = ref<QuestionData | null>(null)
-const selectedOptionId = ref<string | null>(null)
-const hasAnswered = ref(false)
-const connectionError = ref('')
-const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null)
-const waitingForOpponent = ref(false)
-let socket: WebSocket | null = null
+const route = useRoute();
+const router = useRouter();
+const status = ref<"connecting" | "waiting" | "in_progress" | "finished">("connecting");
+const currentQuestion = ref<QuestionData | null>(null);
+const selectedOptionId = ref<string | null>(null);
+const revealedCorrectOptionId = ref<string | null>(null);
+const hasAnswered = ref(false);
+const connectionError = ref("");
+const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null);
+const waitingForOpponent = ref(false);
+
+const correctCount = ref(0);
+const wrongCount = ref(0);
+const totalScore = ref(0);
+const elapsedSeconds = ref(0);
+
+let socket: WebSocket | null = null;
+let sessionTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(async () => {
-  const sessionId = route.params.sessionId as string
+  sessionTimer = setInterval(() => { elapsedSeconds.value += 1; }, 1000);
 
-  if (!sessionId || sessionId === 'undefined') {
-    connectionError.value = 'شناسه بازی نامعتبر است.'
-    return
+  const sessionId = route.params.sessionId as string;
+
+  if (!sessionId || sessionId === "undefined") {
+    connectionError.value = "شناسه بازی نامعتبر است.";
+    return;
   }
 
   try {
-    const ticketRes = await apiClient.post<{ ticket: string }>(
+    const { data: ticketData } = await apiClient.post<{ ticket: string }>(
       `/api/game/duel/${sessionId}/ws-ticket`
-    )
-    const ticket = ticketRes.data.ticket
+    );
 
-    const wsBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('https', 'wss')
+    const wsBaseUrl = import.meta.env.VITE_API_BASE_URL.replace("https", "wss");
     socket = new WebSocket(
-      `${wsBaseUrl}/api/game/duel/${sessionId}/join?ticket=${ticket}`
-    )
+      `${wsBaseUrl}/api/game/duel/${sessionId}/join?ticket=${ticketData.ticket}`
+    );
 
-    status.value = 'waiting'
+    status.value = "waiting";
 
     socket.onmessage = (event) => {
-      const message = JSON.parse(event.data)
+      const message = JSON.parse(event.data);
 
-      if (message.type === 'match_started') {
-        status.value = 'in_progress'
-        currentQuestion.value = message.question ?? null
-        selectedOptionId.value = null
-        hasAnswered.value = false
-        lastResult.value = null
-        waitingForOpponent.value = false
+      if (message.type === "match_started") {
+        status.value = "in_progress";
+        currentQuestion.value = message.question ?? null;
+        selectedOptionId.value = null;
+        revealedCorrectOptionId.value = null;
+        hasAnswered.value = false;
+        lastResult.value = null;
+        waitingForOpponent.value = false;
       }
 
-      if (message.type === 'answer_result') {
-        lastResult.value = { isCorrect: message.isCorrect, pointsAwarded: message.pointsAwarded }
+      if (message.type === "answer_result") {
+        lastResult.value = { isCorrect: message.isCorrect, pointsAwarded: message.pointsAwarded };
+        totalScore.value += message.pointsAwarded;
+
+        // correctOptionId sent from server ONLY after answer is submitted
+        if (message.correctOptionId) {
+          revealedCorrectOptionId.value = message.correctOptionId;
+        }
+
+        if (message.isCorrect) {
+          correctCount.value += 1;
+        } else {
+          wrongCount.value += 1;
+        }
       }
 
-      if (message.type === 'waiting_for_opponent') {
-        waitingForOpponent.value = true
+      if (message.type === "waiting_for_opponent") {
+        waitingForOpponent.value = true;
       }
 
-      if (message.type === 'next_question') {
-        currentQuestion.value = message.question ?? null
-        selectedOptionId.value = null
-        hasAnswered.value = false
-        waitingForOpponent.value = false
+      if (message.type === "next_question") {
+        currentQuestion.value = message.question ?? null;
+        selectedOptionId.value = null;
+        revealedCorrectOptionId.value = null;
+        hasAnswered.value = false;
+        waitingForOpponent.value = false;
       }
 
-      if (message.type === 'match_finished') {
-        status.value = 'finished'
+      if (message.type === "match_finished") {
+        status.value = "finished";
       }
-    }
+    };
 
     socket.onerror = () => {
-      connectionError.value = 'اتصال به بازی برقرار نشد. لطفا دوباره تلاش کنید.'
-    }
+      connectionError.value = "اتصال به بازی برقرار نشد. لطفا دوباره تلاش کنید.";
+    };
 
     socket.onclose = (event) => {
-      if (status.value !== 'finished' && event.code !== 1000) {
-        connectionError.value = 'ارتباط قطع شد. لطفا دوباره تلاش کنید.'
+      if (status.value !== "finished" && event.code !== 1000) {
+        connectionError.value = "ارتباط قطع شد. لطفا دوباره تلاش کنید.";
       }
-    }
+    };
   } catch (err) {
-    connectionError.value = 'خطا در برقراری اتصال به بازی.'
+    connectionError.value = "خطا در برقراری اتصال به بازی.";
   }
-})
+});
 
 onUnmounted(() => {
-  socket?.close(1000)
-})
+  socket?.close(1000);
+  if (sessionTimer) clearInterval(sessionTimer);
+});
 
 function confirmLeave() {
-  const ok = window.confirm('اگر بازگردید، از بازی دونفره خارج می‌شوید. مطمئن هستید؟')
+  const ok = window.confirm("اگر بازگردید، از بازی دونفره خارج می‌شوید. مطمئن هستید؟");
   if (ok) {
-    socket?.close(1000)
-    router.push('/home')
+    socket?.close(1000);
+    if (sessionTimer) clearInterval(sessionTimer);
+    router.push("/home");
   }
 }
 
 function handleAnswer(optionId: string) {
-  if (!socket || hasAnswered.value || !currentQuestion.value) return
-  selectedOptionId.value = optionId
-  hasAnswered.value = true
+  if (!socket || hasAnswered.value || !currentQuestion.value) return;
+  selectedOptionId.value = optionId;
+  hasAnswered.value = true;
   socket.send(
     JSON.stringify({
-      type: 'submit_answer',
+      type: "submit_answer",
       questionId: currentQuestion.value.id,
       selectedOptionId: optionId,
       elapsedMs: 5000,
     })
-  )
+  );
 }
 </script>

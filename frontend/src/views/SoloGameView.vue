@@ -1,8 +1,12 @@
 <template>
-  <div class="min-h-screen p-6 max-w-lg mx-auto flex flex-col gap-6">
-    <div class="flex items-center">
-      <a href="#" class="text-2xl" @click.prevent="confirmLeave">←</a>
-    </div>
+  <div class="min-h-screen max-w-lg mx-auto flex flex-col gap-4 p-4">
+    <GameHeader
+      :correct-count="correctCount"
+      :wrong-count="wrongCount"
+      :elapsed-seconds="elapsedSeconds"
+      :score="totalScore"
+      @leave="confirmLeave"
+    />
 
     <div v-if="loadError" class="flex-1 flex flex-col items-center justify-center text-center">
       <p class="text-lg font-bold text-red-500 mb-3">{{ loadError }}</p>
@@ -36,10 +40,7 @@
             class="text-lg font-bold"
             :class="lastWasCorrect ? 'text-green-500' : 'text-red-500'"
           >
-            {{ lastWasCorrect ? "آفرین!" : "اشتباه بود" }} ({{
-              lastPoints
-            }}
-            امتیاز)
+            {{ lastWasCorrect ? "آفرین!" : "اشتباه بود" }} ({{ lastPoints }} امتیاز)
           </p>
           <button
             class="mt-3 rounded-pill px-6 py-2 bg-accent-light dark:bg-accent-dark text-white font-bold"
@@ -51,9 +52,10 @@
 
         <div v-if="isFinished" class="text-center">
           <h2 class="text-2xl font-bold mb-3">بازی تمام شد!</h2>
-          <router-link to="/home" class="text-accent-light dark:text-accent-dark"
-            >بازگشت به خانه</router-link
-          >
+          <p class="text-lg mb-4">امتیاز کل: <span class="font-bold text-accent-light dark:text-accent-dark">{{ totalScore }}</span></p>
+          <router-link to="/home" class="rounded-pill px-6 py-2 bg-accent-light dark:bg-accent-dark text-white font-bold">
+            بازگشت به خانه
+          </router-link>
         </div>
       </div>
     </template>
@@ -66,6 +68,7 @@ import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/api-client";
 import QuestionCard from "../components/QuestionCard.vue";
 import CircularTimer from "../components/CircularTimer.vue";
+import GameHeader from "../components/GameHeader.vue";
 
 interface QuestionOption {
   id: string;
@@ -91,22 +94,30 @@ const lastPoints = ref(0);
 const secondsLeft = ref(15);
 const loadError = ref("");
 const questionStartedAt = ref(0);
+
+const correctCount = ref(0);
+const wrongCount = ref(0);
+const totalScore = ref(0);
+const elapsedSeconds = ref(0);
+
 let timerInterval: ReturnType<typeof setInterval> | null = null;
+let sessionTimer: ReturnType<typeof setInterval> | null = null;
 let nextQuestionCache: QuestionData | null = null;
 
 onMounted(async () => {
+  sessionTimer = setInterval(() => { elapsedSeconds.value += 1; }, 1000);
+
   try {
-    const data = await apiClient.post<{
+    const { data } = await apiClient.post<{
       sessionId: string;
       firstQuestion: QuestionData;
       totalQuestions: number;
     }>("/api/game/solo/start", { categoryId: route.params.categoryId });
 
-    sessionId.value = data.data.sessionId;
-    currentQuestion.value = data.data.firstQuestion;
+    sessionId.value = data.sessionId;
+    currentQuestion.value = data.firstQuestion;
     startTimer();
   } catch (err) {
-    // این دسته‌بندی سوالی ندارد یا خطای شبکه رخ داده — به‌جای صفحه سفید، پیام واضح نشان می‌دهیم
     loadError.value =
       err instanceof Error && err.message.includes("No questions available")
         ? "این دسته‌بندی هنوز سوالی ندارد. لطفا دسته‌بندی دیگری را انتخاب کنید."
@@ -116,6 +127,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timerInterval) clearInterval(timerInterval);
+  if (sessionTimer) clearInterval(sessionTimer);
 });
 
 function confirmLeave() {
@@ -125,6 +137,7 @@ function confirmLeave() {
     if (!ok) return;
   }
   if (timerInterval) clearInterval(timerInterval);
+  if (sessionTimer) clearInterval(sessionTimer);
   router.push("/home");
 }
 
@@ -147,11 +160,12 @@ async function handleAnswer(optionId: string | null) {
   const elapsedMs = Date.now() - questionStartedAt.value;
 
   try {
-    const data = await apiClient.post<{
+    const { data } = await apiClient.post<{
       isCorrect: boolean;
       pointsAwarded: number;
       hasNext: boolean;
       nextQuestion: QuestionData | null;
+      correctOptionId: string;
     }>("/api/game/solo/answer", {
       sessionId: sessionId.value,
       questionId: currentQuestion.value.id,
@@ -160,11 +174,21 @@ async function handleAnswer(optionId: string | null) {
     });
 
     hasAnswered.value = true;
-    lastWasCorrect.value = data.data.isCorrect;
-    lastPoints.value = data.data.pointsAwarded;
-    hasNext.value = data.data.hasNext;
-    lastCorrectOptionId.value = data.data.isCorrect ? optionId : null;
-    nextQuestionCache = data.data.nextQuestion;
+    lastWasCorrect.value = data.isCorrect;
+    lastPoints.value = data.pointsAwarded;
+    hasNext.value = data.hasNext;
+    totalScore.value += data.pointsAwarded;
+
+    // correctOptionId arrives from server AFTER answer — cannot be guessed by client
+    lastCorrectOptionId.value = data.correctOptionId;
+
+    if (data.isCorrect) {
+      correctCount.value += 1;
+    } else {
+      wrongCount.value += 1;
+    }
+
+    nextQuestionCache = data.nextQuestion;
   } catch (err) {
     loadError.value = "خطا در ثبت پاسخ. لطفا دوباره تلاش کنید.";
   }

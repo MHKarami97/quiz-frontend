@@ -2,13 +2,13 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
 
-// base must match the GitHub repository name for GitHub Pages routing
 export default defineConfig({
   base: "/",
   plugins: [
     vue(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" به کاربر اعلام می‌دهد نسخه جدید موجود است و به تایید نیاز دارد
+      registerType: "prompt",
       includeAssets: ["icons/*.png"],
       manifest: {
         name: "چیستا",
@@ -30,6 +30,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
+        // Cache busting: هر بار build جدید، سرویس‌ورکر کش قدیمی را حذف می‌کند
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

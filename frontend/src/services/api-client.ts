@@ -1,4 +1,5 @@
 import { useAuthStore } from "../store/auth.store";
+import { router } from "../router";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://quiz-of-kings-api.YOUR_SUBDOMAIN.workers.dev";
 
@@ -19,9 +20,17 @@ async function request<T = any>(path: string, options: RequestOptions = {}): Pro
   });
 
   const data = await response.json();
+
+  if (response.status === 401) {
+    authStore.logout();
+    router.push("/");
+    throw new Error("نشست شما منقضی شده است. لطفا دوباره وارد شوید.");
+  }
+
   if (!response.ok) {
     throw new Error(data.error || "درخواست ناموفق بود");
   }
+
   return { data };
 }
 
