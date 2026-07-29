@@ -8,11 +8,13 @@ export const router = createRouter({
       path: "/",
       name: "login",
       component: () => import("../views/LoginView.vue"),
+      meta: { guestOnly: true }, // اضافه شدن متا تگ
     },
     {
       path: "/register",
       name: "register",
       component: () => import("../views/RegisterView.vue"),
+      meta: { guestOnly: true }, // اضافه شدن متا تگ
     },
     {
       path: "/home",
@@ -108,7 +110,19 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const authStore = useAuthStore();
-  if (to.meta.requiresAuth && !authStore.isAuthenticated)
+
+  // ۱. جلوگیری از دسترسی کاربران لاگین‌نشده به صفحات محافظت‌شده
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return { name: "login" };
-  if (to.meta.requiresAdmin && !authStore.isAdmin) return { name: "home" };
+  }
+
+  // ۲. جلوگیری از دسترسی کاربران عادی به پنل ادمین
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return { name: "home" };
+  }
+
+  // ۳. جلوگیری از دسترسی کاربران لاگین‌شده به صفحات لاگین/ثبت‌نام
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return { name: "home" };
+  }
 });
