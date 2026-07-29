@@ -43,6 +43,7 @@ const navItems = [
   { to: "/admin/questions", label: "سؤالات", icon: "❓" },
   { to: "/admin/users", label: "کاربران", icon: "👥" },
   { to: "/admin/promo-codes", label: "کدهای تخفیف", icon: "🎁" },
+  { to: "/admin/reports", label: "گزارش‌ها", icon: "🚩" },
 ];
 
 function isActive(path: string) {

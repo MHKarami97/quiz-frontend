@@ -67,6 +67,11 @@ export const router = createRouter({
           component: () => import("../views/admin/AdminCategoriesView.vue"),
         },
         {
+          path: "reports",
+          name: "admin-reports",
+          component: () => import("../views/admin/AdminReportsView.vue"),
+        },
+        {
           path: "questions",
           name: "admin-questions",
           component: () => import("../views/admin/AdminQuestionsView.vue"),

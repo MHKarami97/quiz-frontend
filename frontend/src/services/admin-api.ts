@@ -32,6 +32,16 @@ export interface DashboardStats {
   totalCategories: number;
   totalGameSessions: number;
 }
+export interface AdminReport {
+  id: string;
+  questionId: string;
+  questionText: string;
+  userId: string;
+  userName: string;
+  reason: string;
+  status: 'pending' | 'resolved' | 'dismissed';
+  createdAt: string;
+}
 export interface PaginatedResult<T> { items: T[]; total: number; page: number; pageSize: number; }
 
 export const adminApi = {
@@ -71,4 +81,9 @@ export const adminApi = {
   updatePromoCode: (id: string, discountPercent: number, maxUses: number, isActive: boolean) =>
     apiClient.put(`/api/admin/promo-codes/${id}`, { discountPercent, maxUses, isActive }),
   deletePromoCode: (id: string) => apiClient.delete(`/api/admin/promo-codes/${id}`),
+
+  listReports: (page: number, status: string = 'pending') =>
+    apiClient.get<{items: AdminReport[]}>(`/api/reports/admin?status=${status}`),
+  updateReportStatus: (id: string, status: 'resolved' | 'dismissed') =>
+    apiClient.put(`/api/reports/admin/${id}/status`, { status }),
 };
