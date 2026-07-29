@@ -58,6 +58,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/api-client";
+import { useGameStore } from "../store/game.store";
 import QuestionCard from "../components/QuestionCard.vue";
 import GameHeader from "../components/GameHeader.vue";
 
@@ -73,6 +74,8 @@ interface QuestionData {
 
 const route = useRoute();
 const router = useRouter();
+const gameStore = useGameStore();
+
 const status = ref<"connecting" | "waiting" | "in_progress" | "finished">("connecting");
 const currentQuestion = ref<QuestionData | null>(null);
 const selectedOptionId = ref<string | null>(null);
@@ -81,8 +84,9 @@ const hasAnswered = ref(false);
 const connectionError = ref("");
 const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null);
 const waitingForOpponent = ref(false);
-const totalQuestions = ref(0)
-const currentIndex = ref(0)
+const totalQuestions = ref(0);
+const currentIndex = ref(0);
+const questionStartedAt = ref(0);
 
 const correctCount = ref(0);
 const wrongCount = ref(0);
@@ -125,15 +129,15 @@ onMounted(async () => {
         hasAnswered.value = false;
         lastResult.value = null;
         waitingForOpponent.value = false;
-        totalQuestions.value = message.totalQuestions ?? 0
-        currentIndex.value = (message.questionIndex ?? 0) + 1
+        totalQuestions.value = message.totalQuestions ?? 0;
+        currentIndex.value = (message.questionIndex ?? 0) + 1;
+        questionStartedAt.value = Date.now();
       }
 
       if (message.type === "answer_result") {
         lastResult.value = { isCorrect: message.isCorrect, pointsAwarded: message.pointsAwarded };
         totalScore.value += message.pointsAwarded;
 
-        // correctOptionId sent from server ONLY after answer is submitted
         if (message.correctOptionId) {
           revealedCorrectOptionId.value = message.correctOptionId;
         }
@@ -155,12 +159,14 @@ onMounted(async () => {
         revealedCorrectOptionId.value = null;
         hasAnswered.value = false;
         waitingForOpponent.value = false;
-        totalQuestions.value = message.totalQuestions ?? totalQuestions.value
-        currentIndex.value = (message.questionIndex ?? 0) + 1
+        totalQuestions.value = message.totalQuestions ?? totalQuestions.value;
+        currentIndex.value = (message.questionIndex ?? 0) + 1;
+        questionStartedAt.value = Date.now();
       }
 
       if (message.type === "match_finished") {
         status.value = "finished";
+        gameStore.markGameFinished();
       }
     };
 
@@ -188,20 +194,24 @@ function confirmLeave() {
   if (ok) {
     socket?.close(1000);
     if (sessionTimer) clearInterval(sessionTimer);
+    gameStore.markGameFinished();
     router.push("/home");
   }
 }
 
 function handleAnswer(optionId: string) {
   if (!socket || hasAnswered.value || !currentQuestion.value) return;
+  
   selectedOptionId.value = optionId;
   hasAnswered.value = true;
+  const elapsedMs = Date.now() - questionStartedAt.value;
+
   socket.send(
     JSON.stringify({
       type: "submit_answer",
       questionId: currentQuestion.value.id,
       selectedOptionId: optionId,
-      elapsedMs: 5000,
+      elapsedMs,
     })
   );
 }

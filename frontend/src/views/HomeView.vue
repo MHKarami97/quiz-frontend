@@ -6,10 +6,10 @@
           <span class="text-xl">🪙</span>
           <span class="font-bold">{{ authStore.user?.coins ?? 0 }}</span>
         </div>
-        <div v-if="myScore" class="flex items-center gap-2">
+        <div v-if="gameStore.myScore" class="flex items-center gap-2">
           <span class="text-xl">🏆</span>
-          <span class="font-bold">{{ myScore.totalPoints }}</span>
-          <span v-if="myScore.rank" class="text-xs text-gray-500">(رتبه {{ myScore.rank }})</span>
+          <span class="font-bold">{{ gameStore.myScore.totalPoints }}</span>
+          <span v-if="gameStore.myScore.rank" class="text-xs text-gray-500">(رتبه {{ gameStore.myScore.rank }})</span>
         </div>
       </div>
       <router-link to="/settings" class="text-2xl">⚙️</router-link>
@@ -40,7 +40,7 @@
 
     <div v-else class="grid grid-cols-2 gap-4 mb-6">
       <div
-        v-for="category in categories"
+        v-for="category in gameStore.categories"
         :key="category.id"
         class="rounded-card bg-card-light dark:bg-card-dark border border-border-light dark:border-border-dark p-4 text-center cursor-pointer"
         @click="startGame(category.id)"
@@ -48,7 +48,7 @@
         <div class="text-3xl mb-2">{{ category.icon }}</div>
         <div class="font-semibold">{{ category.name }}</div>
       </div>
-      <p v-if="categories.length === 0" class="col-span-2 text-center text-gray-500 py-8">
+      <p v-if="gameStore.categories.length === 0" class="col-span-2 text-center text-gray-500 py-8">
         دسته‌بندی‌ای یافت نشد.
       </p>
     </div>
@@ -62,40 +62,29 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/auth.store'
+import { useGameStore } from '../store/game.store'
 import AdSlot from '../components/AdSlot.vue'
 import BottomNav from '../components/BottomNav.vue'
-import { apiClient } from '../services/api-client'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const gameStore = useGameStore()
 const mode = ref<'solo' | 'duel'>('solo')
 
-interface Category {
-  id: string
-  name: string
-  icon: string
-}
-
-const categories = ref<Category[]>([])
 const isLoading = ref(true)
 const errorMessage = ref('')
-const myScore = ref<{ totalPoints: number; rank: number | null } | null>(null)
 
 onMounted(async () => {
+  isLoading.value = true
   try {
-    const { data } = await apiClient.get<Category[]>("/api/categories");
-    categories.value = data;
+    await Promise.all([
+      gameStore.fetchCategories(),
+      gameStore.fetchScore()
+    ])
   } catch (err) {
-    errorMessage.value = err instanceof Error ? err.message : 'خطا در دریافت دسته‌بندی‌ها'
+    errorMessage.value = err instanceof Error ? err.message : 'خطا در دریافت اطلاعات'
   } finally {
     isLoading.value = false
-  }
-
-  try {
-    const { data } = await apiClient.get<{ totalPoints: number; rank: number | null }>("/api/leaderboard/me")
-    myScore.value = data
-  } catch {
-    // نمایش امتیاز اختیاری است؛ اگر شکست خورد نباید مانع نمایش بقیه صفحه شود
   }
 })
 

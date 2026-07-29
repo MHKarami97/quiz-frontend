@@ -38,7 +38,7 @@
           @answer="handleAnswer"
         />
 
-        <div v-if="hasAnswered" class="text-center">
+        <div v-if="hasAnswered && lastCorrectOptionId" class="text-center">
           <p
             class="text-lg font-bold"
             :class="lastWasCorrect ? 'text-green-500' : 'text-red-500'"
@@ -69,6 +69,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiClient } from "../services/api-client";
+import { useGameStore } from "../store/game.store";
 import QuestionCard from "../components/QuestionCard.vue";
 import CircularTimer from "../components/CircularTimer.vue";
 import GameHeader from "../components/GameHeader.vue";
@@ -85,6 +86,8 @@ interface QuestionData {
 
 const route = useRoute();
 const router = useRouter();
+const gameStore = useGameStore();
+
 const sessionId = ref("");
 const currentQuestion = ref<QuestionData | null>(null);
 const selectedOptionId = ref<string | null>(null);
@@ -144,6 +147,8 @@ function confirmLeave() {
   }
   if (timerInterval) clearInterval(timerInterval);
   if (sessionTimer) clearInterval(sessionTimer);
+  
+  gameStore.markGameFinished();
   router.push("/home");
 }
 
@@ -163,6 +168,7 @@ async function handleAnswer(optionId: string | null) {
   if (timerInterval) clearInterval(timerInterval);
 
   selectedOptionId.value = optionId;
+  hasAnswered.value = true; // این خط قبل از گرفتن پاسخ جابجا شده تا از کلیک مجدد جلوگیری و سرعت گرافیکی را بالا ببرد
   const elapsedMs = Date.now() - questionStartedAt.value;
 
   try {
@@ -179,24 +185,18 @@ async function handleAnswer(optionId: string | null) {
       elapsedMs,
     });
 
-    hasAnswered.value = true;
     lastWasCorrect.value = data.isCorrect;
     lastPoints.value = data.pointsAwarded;
     hasNext.value = data.hasNext;
     totalScore.value += data.pointsAwarded;
-    lastCorrectOptionId.value = data.isCorrect ? optionId : null;
-    nextQuestionCache = data.nextQuestion;
-
-    // correctOptionId arrives from server AFTER answer — cannot be guessed by client
     lastCorrectOptionId.value = data.correctOptionId;
+    nextQuestionCache = data.nextQuestion;
 
     if (data.isCorrect) {
       correctCount.value += 1;
     } else {
       wrongCount.value += 1;
     }
-
-    nextQuestionCache = data.nextQuestion;
   } catch (err) {
     loadError.value = "خطا در ثبت پاسخ. لطفا دوباره تلاش کنید.";
   }
@@ -205,6 +205,7 @@ async function handleAnswer(optionId: string | null) {
 function nextStep() {
   if (!hasNext.value || !nextQuestionCache) {
     isFinished.value = true;
+    gameStore.markGameFinished();
     return;
   }
   currentQuestion.value = nextQuestionCache;

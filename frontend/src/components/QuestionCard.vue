@@ -33,7 +33,12 @@ function getOptionState(optionId: string): "idle" | "selected" | "correct" | "wr
   if (!props.hasAnswered) {
     return optionId === props.selectedOptionId ? "selected" : "idle";
   }
-  if (props.correctOptionId && optionId === props.correctOptionId) return "correct";
+  // تا زمانی که سرور پاسخ صحیح را مشخص نکرده، فقط حالت انتخاب شده را نشان بده
+  if (!props.correctOptionId) {
+    return optionId === props.selectedOptionId ? "selected" : "idle";
+  }
+  
+  if (optionId === props.correctOptionId) return "correct";
   if (optionId === props.selectedOptionId) return "wrong";
   return "idle";
 }
