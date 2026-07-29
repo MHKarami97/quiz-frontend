@@ -4,7 +4,7 @@
       class="flex items-center gap-2 rounded-pill px-3 py-1.5 border border-border-light dark:border-border-dark text-sm font-bold hover:bg-accent-light/10 transition-colors"
       @click="$emit('leave')"
     >
-      <span class="text-base">←</span>
+      <span class="text-base">→</span>
       <span>خروج</span>
     </button>
 
