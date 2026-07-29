@@ -34,7 +34,7 @@
     <p class="text-lg font-semibold leading-relaxed mb-6 mt-4">{{ question.text }}</p>
     <div class="grid grid-cols-1 gap-3">
       <AnswerButton
-        v-for="option in question.options"
+        v-for="option in shuffledOptions"
         :key="option.id"
         :text="option.text"
         :state="getOptionState(option.id)"
@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch, onUnmounted } from "vue";
 import { apiClient } from "../services/api-client";
 import AnswerButton from "./AnswerButton.vue";
 
@@ -59,43 +59,86 @@ const props = defineProps<{
   correctOptionId: string | null;
   hasAnswered: boolean;
 }>();
-defineEmits<{ answer: [optionId: string] }>();
 
+const emit = defineEmits<{ answer: [optionId: string] }>();
+
+// State
 const showReportPanel = ref(false);
 const reportReason = ref('wrong_answer');
 const reportMessage = ref('');
 const reportError = ref(false);
 const isSubmittingReport = ref(false);
 
-function getOptionState(optionId: string): "idle" | "selected" | "correct" | "wrong" {
-  if (!props.hasAnswered) {
-    return optionId === props.selectedOptionId ? "selected" : "idle";
+const shuffledOptions = ref<QuestionOption[]>([]);
+let reportTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+// Methods
+
+/**
+ * Fisher-Yates Shuffle Algorithm
+ * Pure function to shuffle array without mutating the original prop
+ */
+const shuffleArray = (array: QuestionOption[]): QuestionOption[] => {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
   }
-  if (!props.correctOptionId) {
+  return result;
+};
+
+const getOptionState = (optionId: string): "idle" | "selected" | "correct" | "wrong" => {
+  if (!props.hasAnswered || !props.correctOptionId) {
     return optionId === props.selectedOptionId ? "selected" : "idle";
   }
   if (optionId === props.correctOptionId) return "correct";
   if (optionId === props.selectedOptionId) return "wrong";
   return "idle";
-}
+};
 
-async function submitReport() {
+const submitReport = async () => {
+  if (isSubmittingReport.value) return; // Prevent double-clicks
+
   isSubmittingReport.value = true;
   reportMessage.value = '';
   reportError.value = false;
+
   try {
-    // اصلاح مسیر فراخوانی API متناسب با روتر بک‌اند شما
     await apiClient.post('/api/reports', {
       questionId: props.question.id,
       reason: reportReason.value
     });
+    
     reportMessage.value = 'گزارش با موفقیت ثبت شد. با تشکر!';
-    setTimeout(() => { showReportPanel.value = false; reportMessage.value = ''; }, 2000);
+    
+    // Clear previous timeout if exists to prevent memory leaks
+    if (reportTimeoutId) clearTimeout(reportTimeoutId);
+    
+    reportTimeoutId = setTimeout(() => { 
+      showReportPanel.value = false; 
+      reportMessage.value = ''; 
+    }, 2000);
+
   } catch (err) {
     reportError.value = true;
     reportMessage.value = 'خطا در ثبت گزارش. لطفاً دوباره تلاش کنید.';
   } finally {
     isSubmittingReport.value = false;
   }
-}
+};
+
+// Watchers & Lifecycle
+watch(
+  () => props.question,
+  (newQuestion) => {
+    if (newQuestion && newQuestion.options) {
+      shuffledOptions.value = shuffleArray(newQuestion.options);
+    }
+  },
+  { immediate: true }
+);
+
+onUnmounted(() => {
+  if (reportTimeoutId) clearTimeout(reportTimeoutId);
+});
 </script>
