@@ -24,6 +24,9 @@
     </div>
 
     <div v-else-if="status === 'in_progress'" class="flex-1 flex flex-col justify-center gap-6">
+      <p v-if="currentQuestion" class="text-center text-sm text-gray-500 dark:text-gray-400">
+        سوال {{ currentIndex }} از {{ totalQuestions }}
+      </p>
       <p v-if="lastResult" class="text-center font-bold" :class="lastResult.isCorrect ? 'text-green-500' : 'text-red-500'">
         {{ lastResult.isCorrect ? "آفرین!" : "اشتباه بود" }} ({{ lastResult.pointsAwarded }} امتیاز)
       </p>
@@ -78,6 +81,8 @@ const hasAnswered = ref(false);
 const connectionError = ref("");
 const lastResult = ref<{ isCorrect: boolean; pointsAwarded: number } | null>(null);
 const waitingForOpponent = ref(false);
+const totalQuestions = ref(0)
+const currentIndex = ref(0)
 
 const correctCount = ref(0);
 const wrongCount = ref(0);
@@ -120,6 +125,8 @@ onMounted(async () => {
         hasAnswered.value = false;
         lastResult.value = null;
         waitingForOpponent.value = false;
+        totalQuestions.value = message.totalQuestions ?? 0
+        currentIndex.value = (message.questionIndex ?? 0) + 1
       }
 
       if (message.type === "answer_result") {
@@ -148,6 +155,8 @@ onMounted(async () => {
         revealedCorrectOptionId.value = null;
         hasAnswered.value = false;
         waitingForOpponent.value = false;
+        totalQuestions.value = message.totalQuestions ?? totalQuestions.value
+        currentIndex.value = (message.questionIndex ?? 0) + 1
       }
 
       if (message.type === "match_finished") {

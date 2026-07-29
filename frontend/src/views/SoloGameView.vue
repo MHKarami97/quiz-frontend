@@ -20,6 +20,9 @@
 
     <template v-else>
       <div class="flex-1 flex flex-col justify-center gap-6">
+        <p v-if="currentQuestion" class="text-center text-sm text-gray-500 dark:text-gray-400">
+          سوال {{ currentIndex }} از {{ totalQuestions }}
+        </p>
         <CircularTimer
           v-if="currentQuestion"
           :seconds-left="secondsLeft"
@@ -94,7 +97,8 @@ const lastPoints = ref(0);
 const secondsLeft = ref(15);
 const loadError = ref("");
 const questionStartedAt = ref(0);
-
+const totalQuestions = ref(0);
+const currentIndex = ref(0);
 const correctCount = ref(0);
 const wrongCount = ref(0);
 const totalScore = ref(0);
@@ -116,6 +120,8 @@ onMounted(async () => {
 
     sessionId.value = data.sessionId;
     currentQuestion.value = data.firstQuestion;
+    totalQuestions.value = data.totalQuestions;
+    currentIndex.value = 1;
     startTimer();
   } catch (err) {
     loadError.value =
@@ -178,6 +184,8 @@ async function handleAnswer(optionId: string | null) {
     lastPoints.value = data.pointsAwarded;
     hasNext.value = data.hasNext;
     totalScore.value += data.pointsAwarded;
+    lastCorrectOptionId.value = data.isCorrect ? optionId : null;
+    nextQuestionCache = data.nextQuestion;
 
     // correctOptionId arrives from server AFTER answer — cannot be guessed by client
     lastCorrectOptionId.value = data.correctOptionId;
@@ -203,6 +211,7 @@ function nextStep() {
   selectedOptionId.value = null;
   lastCorrectOptionId.value = null;
   hasAnswered.value = false;
+  currentIndex.value += 1;
   startTimer();
 }
 </script>
