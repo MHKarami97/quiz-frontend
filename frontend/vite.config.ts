@@ -16,7 +16,7 @@ export default defineConfig({
         description: "بازی چیستا آنلاین تک‌نفره و دونفره",
         theme_color: "#611f69",
         background_color: "#fefbff",
-        display: "standalone",
+        display: "fullscreen",
         orientation: "portrait",
         start_url: "/",
         icons: [
