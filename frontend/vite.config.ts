@@ -29,8 +29,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,png,svg,woff2}"],
-        // Cache busting: هر بار build جدید، سرویس‌ورکر کش قدیمی را حذف می‌کند
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg,avif,gif,woff,woff2,json,webmanifest}"],
+        navigateFallback: "index.html",
         cleanupOutdatedCaches: true,
       },
     }),
